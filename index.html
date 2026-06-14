@@ -294,6 +294,11 @@ body::before{
 #toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 28px);transform:translateX(-50%) translateY(100px);background:var(--burgundy);color:var(--cream);padding:13px 22px;border-radius:14px;font-weight:700;font-size:14px;z-index:400;box-shadow:var(--shadow);opacity:0;transition:.3s cubic-bezier(.2,.8,.2,1);border:1px solid var(--burgundy-soft);}
 #toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 
+/* cloud save indicator */
+#save-dot{width:9px;height:9px;border-radius:50%;background:var(--ink-faint);flex-shrink:0;transition:.3s;}
+#save-dot.saved{background:var(--ok);box-shadow:0 0 8px rgba(111,174,90,.5);}
+#save-dot.error{background:var(--danger);}
+
 /* ════════════ DESKTOP / WIDE SCREENS ════════════ */
 @media(min-width:820px){
   :root{--r:18px;}
@@ -355,7 +360,10 @@ body::before{
         <div class="brand-sub" id="emp-count">SHIFTS</div>
       </div>
     </div>
-    <button id="gear-btn" title="ניהול עובדים"><span>👥</span><span>עובדים</span></button>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="save-dot" title="טוען..."></span>
+      <button id="gear-btn" title="ניהול עובדים"><span>👥</span><span>עובדים</span></button>
+    </div>
   </div>
 </header>
 
@@ -464,7 +472,53 @@ body::before{
 
 <div id="toast"></div>
 
-<script>
+<script type="module">
+// ════════════ FIREBASE ════════════
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyASnhdtgX1kzj7cSdT7JYA1T2OvOTis_Lo",
+  authDomain: "la-pampa-shifts.firebaseapp.com",
+  projectId: "la-pampa-shifts",
+  storageBucket: "la-pampa-shifts.firebasestorage.app",
+  messagingSenderId: "833025307455",
+  appId: "1:833025307455:web:5384322247d7e8d940998a"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const DOC_REF = doc(db, "appdata", "main");
+
+let saveTimer = null;
+let cloudReady = false;
+function cloudSave(){
+  if(!cloudReady) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{
+      await setDoc(DOC_REF, { employees, availability, schedule, finalized });
+      const d=$('save-dot'); if(d){ d.className='saved'; d.title='נשמר בענן'; }
+    }catch(err){
+      console.error('save failed',err);
+      const d=$('save-dot'); if(d){ d.className='error'; d.title='שגיאת שמירה'; }
+    }
+  }, 600);
+}
+async function cloudLoad(){
+  try{
+    const snap = await getDoc(DOC_REF);
+    if(snap.exists()){
+      const d = snap.data();
+      if(d.employees) employees = d.employees;
+      if(d.availability) availability = d.availability;
+      if(d.schedule) schedule = d.schedule;
+      if(d.finalized) finalized = d.finalized;
+    }
+  }catch(err){ console.error('load failed',err); }
+  cloudReady = true;
+  renderAll();
+}
+
 const DAYS_HE=["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
 const SHIFTS=[
   {id:"morning",label:"בוקר",time:"11:00–16:00",color:"#F2A71B"},
@@ -498,8 +552,8 @@ function totalAssigned(e){return Object.values(getWeekSched()).filter(a=>a.inclu
 
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);}
 
-function toggleAssign(e,d,s){if(isFinalized())return;if(!schedule[weekOffset])schedule[weekOffset]={};const k=cellKey(d,s),c=schedule[weekOffset][k]||[];schedule[weekOffset][k]=c.includes(e)?c.filter(x=>x!==e):[...c,e];renderAll();}
-function toggleAvail(e,d,s){if(!availability[e])availability[e]={};if(!availability[e][weekOffset])availability[e][weekOffset]={};const k=cellKey(d,s);if(availability[e][weekOffset][k])delete availability[e][weekOffset][k];else availability[e][weekOffset][k]=true;renderAll();}
+function toggleAssign(e,d,s){if(isFinalized())return;if(!schedule[weekOffset])schedule[weekOffset]={};const k=cellKey(d,s),c=schedule[weekOffset][k]||[];schedule[weekOffset][k]=c.includes(e)?c.filter(x=>x!==e):[...c,e];renderAll();cloudSave();}
+function toggleAvail(e,d,s){if(!availability[e])availability[e]={};if(!availability[e][weekOffset])availability[e][weekOffset]={};const k=cellKey(d,s);if(availability[e][weekOffset][k])delete availability[e][weekOffset][k];else availability[e][weekOffset][k]=true;renderAll();cloudSave();}
 
 /* ── CANVAS IMAGE (La Pampa themed) ── */
 function drawImage(){
@@ -649,7 +703,7 @@ $('finalize-btn').onclick=()=>{
   document.querySelector('.tab-btn[data-tab="final"]').classList.add('active');
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   $('view-final').classList.add('active');
-  renderAll();toast('הלוח פורסם! 🎉');
+  renderAll();cloudSave();toast('הלוח פורסם! 🎉');
 };
 $('gear-btn').onclick=()=>{renderEmpManage();$('emp-manage-modal').classList.add('open');};
 $('close-emp-manage').onclick=()=>$('emp-manage-modal').classList.remove('open');
@@ -658,7 +712,7 @@ $('emp-manage-list').addEventListener('click',e=>{const b=e.target.closest('.em-
   pendingDeleteId=parseInt(b.dataset.id);const nm=b.dataset.name,co=b.dataset.color;
   const av=$('cd-av');av.style.cssText=`width:62px;height:62px;border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;background:${co}2e;border:2px solid ${co};color:${co}`;av.textContent=nm[0];
   $('cd-nm').textContent=nm;$('confirm-delete-modal').classList.add('open');});
-$('cd-yes').onclick=()=>{if(!pendingDeleteId)return;const e=getEmp(pendingDeleteId);employees=employees.filter(x=>x.id!==pendingDeleteId);delete availability[pendingDeleteId];if(selectedAvailEmp===pendingDeleteId)selectedAvailEmp=null;pendingDeleteId=null;$('confirm-delete-modal').classList.remove('open');renderAll();toast('העובד נמחק');};
+$('cd-yes').onclick=()=>{if(!pendingDeleteId)return;const e=getEmp(pendingDeleteId);employees=employees.filter(x=>x.id!==pendingDeleteId);delete availability[pendingDeleteId];if(selectedAvailEmp===pendingDeleteId)selectedAvailEmp=null;pendingDeleteId=null;$('confirm-delete-modal').classList.remove('open');renderAll();cloudSave();toast('העובד נמחק');};
 $('cd-no').onclick=()=>{pendingDeleteId=null;$('confirm-delete-modal').classList.remove('open');};
 $('confirm-delete-modal').addEventListener('click',e=>{if(e.target===$('confirm-delete-modal')){pendingDeleteId=null;$('confirm-delete-modal').classList.remove('open');}});
 $('open-add-emp-btn').onclick=()=>{$('emp-manage-modal').classList.remove('open');$('new-emp-name').value='';$('add-emp-modal').classList.add('open');setTimeout(()=>$('new-emp-name').focus(),100);};
@@ -666,14 +720,16 @@ $('cancel-add-emp').onclick=()=>$('add-emp-modal').classList.remove('open');
 $('add-emp-modal').addEventListener('click',e=>{if(e.target===$('add-emp-modal'))$('add-emp-modal').classList.remove('open');});
 $('confirm-add-emp').onclick=addEmp;
 $('new-emp-name').addEventListener('keydown',e=>{if(e.key==='Enter')addEmp();});
-function addEmp(){const nm=$('new-emp-name').value.trim();if(!nm){toast('הכנס שם עובד');return;}const role=$('new-emp-role').value;const color=EMP_COLORS[employees.length%EMP_COLORS.length];employees.push({id:Date.now(),name:nm,role,color});$('add-emp-modal').classList.remove('open');renderAll();toast(`${nm} נוסף/ה`);}
+function addEmp(){const nm=$('new-emp-name').value.trim();if(!nm){toast('הכנס שם עובד');return;}const role=$('new-emp-role').value;const color=EMP_COLORS[employees.length%EMP_COLORS.length];employees.push({id:Date.now(),name:nm,role,color});$('add-emp-modal').classList.remove('open');renderAll();cloudSave();toast(`${nm} נוסף/ה`);}
 $('main').addEventListener('click',e=>{
   const p=e.target.closest('.pill');if(p&&!isFinalized()){toggleAssign(parseInt(p.dataset.emp),parseInt(p.dataset.day),p.dataset.shift);return;}
   const c=e.target.closest('[data-av-emp]');if(c){const id=parseInt(c.dataset.avEmp);selectedAvailEmp=selectedAvailEmp===id?null:id;renderAvail();return;}
   const cl=e.target.closest('.avail-cell');if(cl&&selectedAvailEmp!==null){toggleAvail(selectedAvailEmp,parseInt(cl.dataset.avDay),cl.dataset.avShift);return;}
 });
 const rs=$('new-emp-role');ROLES.forEach(r=>{const o=document.createElement('option');o.textContent=r;rs.appendChild(o);});
-renderAll();
+renderAll();   // render immediately with defaults
+cloudLoad();   // then load saved data from cloud and re-render
+
 </script>
 </body>
 </html>
