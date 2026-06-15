@@ -682,7 +682,7 @@ function drawImage(){
   x.fillStyle='#F2A71B';x.font='700 22px Anton,"Heebo",sans-serif';
   x.fillText('La Pampa Shifts  ·  The Story of Meat 🍔', W/2, H-20);
 
-  return c.toDataURL('image/png');
+  return c.toDataURL('image/jpeg', 0.95);
 }
 function rr(x,a,b,w,h,r){ if(x.roundRect){x.beginPath();x.roundRect(a,b,w,h,r);} else {x.beginPath();x.rect(a,b,w,h);} }
 
@@ -758,7 +758,7 @@ function renderFinal(){
   const dl=$('download-btn');
   if(!isFinalized()){dl.style.display='none';
     $('final-content').innerHTML=`<div class="card empty-state"><div class="empty-ic">📋</div><div class="empty-tt">הלוח עדיין לא פורסם</div><div class="empty-sb">סיים לשבץ את המשמרות, ואז לחץ "פרסם ✓" כדי ליצור לוח מעוצב לשיתוף</div></div>`;return;}
-  dl.style.display='inline-flex';if(imgDataUrl){dl.href=imgDataUrl;dl.download=`לוח-משמרות-${weekLabel(weekOffset)}.png`;}
+  dl.style.display='inline-flex';if(imgDataUrl){dl.href=imgDataUrl;dl.download=`לוח-משמרות-${weekLabel(weekOffset)}.jpg`;}
   let h='';
   if(imgDataUrl)h+=`<div class="card" id="img-wrap"><div id="img-head"><span>📸 תמונה לשיתוף בוואטסאפ</span><button id="regen-btn">רענן</button></div><img id="schedule-img" src="${imgDataUrl}" alt="לוח"/><div id="img-hint">לחץ "הורד תמונה" למעלה, ואז שלח לקבוצת העובדים</div></div>`;
   h+='<div class="day-cards">';
