@@ -511,9 +511,19 @@ async function cloudLoad(){
     const snap = await getDoc(DOC_REF);
     if(snap.exists()){
       const d = snap.data();
-      if(d.employees)    employees    = d.employees;
+      if(d.employees)    employees    = d.employees.map(e=>({...e, id:Number(e.id)}));
       if(d.availability) availability = d.availability;
-      if(d.schedule)     schedule     = d.schedule;
+      if(d.schedule){
+        // normalize empIds inside schedule arrays to numbers
+        const s={};
+        Object.keys(d.schedule).forEach(wk=>{
+          s[wk]={};
+          Object.keys(d.schedule[wk]).forEach(cell=>{
+            s[wk][cell]=(d.schedule[wk][cell]||[]).map(Number);
+          });
+        });
+        schedule=s;
+      }
       if(d.finalized)    finalized    = d.finalized;
     }
   }catch(err){ console.error('load failed',err); }
@@ -555,7 +565,7 @@ function totalAssigned(e){return Object.values(getWeekSched()).filter(a=>a.inclu
 
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);}
 
-function toggleAssign(e,d,s){if(isFinalized())return;if(!schedule[weekOffset])schedule[weekOffset]={};const k=cellKey(d,s),c=schedule[weekOffset][k]||[];schedule[weekOffset][k]=c.includes(e)?c.filter(x=>x!==e):[...c,e];renderAll();cloudSave();}
+function toggleAssign(e,d,s){if(isFinalized())return;e=Number(e);if(!schedule[weekOffset])schedule[weekOffset]={};const k=cellKey(d,s),c=(schedule[weekOffset][k]||[]).map(Number);schedule[weekOffset][k]=c.includes(e)?c.filter(x=>x!==e):[...c,e];renderAll();cloudSave();}
 function toggleAvail(e,d,s){if(!availability[e])availability[e]={};if(!availability[e][weekOffset])availability[e][weekOffset]={};const k=cellKey(d,s);if(availability[e][weekOffset][k])delete availability[e][weekOffset][k];else availability[e][weekOffset][k]=true;renderAll();cloudSave();}
 
 /* ── CANVAS IMAGE (La Pampa themed) ── */
