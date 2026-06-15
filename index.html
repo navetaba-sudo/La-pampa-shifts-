@@ -573,7 +573,9 @@ function toggleAvail(e,d,s){if(!availability[e])availability[e]={};if(!availabil
 /* ── CANVAS IMAGE (La Pampa themed) ── */
 function drawImage(){
   const c=$('schedule-canvas'),dpr=window.devicePixelRatio||1;
-  const W=1400, H=240+SHIFTS.length*200+70;   // big, room to breathe
+  const LEFT=210;                                  // shift-label column (right side)
+  const PADX=30;
+  const W=1480, H=240+SHIFTS.length*200+70;
   c.width=W*dpr;c.height=H*dpr;c.style.width=W+'px';c.style.height=H+'px';
   const x=c.getContext('2d');x.scale(dpr,dpr);
   const wd=getWeekDates(weekOffset);
@@ -585,92 +587,93 @@ function drawImage(){
   const HB=150;
   const g=x.createLinearGradient(0,0,0,HB);g.addColorStop(0,'#46241a');g.addColorStop(1,'#2c1813');
   x.fillStyle=g;x.fillRect(0,0,W,HB);
-  x.fillStyle='#F2A71B';x.fillRect(0,0,W,7);            // mustard top accent
+  x.fillStyle='#F2A71B';x.fillRect(0,0,W,7);
 
   x.direction='rtl';x.textAlign='right';
   x.fillStyle='#F7EBD3';x.font='800 50px Anton,"Heebo",sans-serif';
-  x.fillText('LA PAMPA',W-40,66);
+  x.fillText('LA PAMPA',W-PADX,66);
   x.fillStyle='#F2A71B';x.font='800 26px Anton,"Heebo",sans-serif';
-  x.fillText('לוח משמרות',W-40,104);
+  x.fillText('לוח משמרות',W-PADX,104);
   x.fillStyle='#C7A98A';x.font='600 22px "Heebo",sans-serif';
-  x.fillText(`${weekLabel(weekOffset)}  ·  ${fmt(wd[0])} – ${fmt(wd[6])}`,W-40,134);
+  x.fillText(`${weekLabel(weekOffset)}  ·  ${fmt(wd[0])} – ${fmt(wd[6])}`,W-PADX,134);
 
-  // ---- layout grid ----
-  const LEFT=190;                                  // shift label column width
-  const COL=(W-LEFT-30)/7;
-  const headY=HB+10;
-  const headH=64;
-  const ROW=200;
-  const sY=headY+headH;
+  // ---- layout: 7 day columns LEFT of the shift-label column ----
+  const gridRight = W - LEFT;                      // day grid ends here (right edge)
+  const gridLeft  = PADX;
+  const COL = (gridRight - gridLeft) / 7;
+  const headY=HB+10, headH=64, ROW=200, sY=headY+headH;
 
-  // ---- day headers ----
-  wd.forEach((d,i)=>{
-    const cx=W-30-(i*COL)-COL/2;                    // RTL: ראשון on the right
+  // day headers — ראשון on the right, שבת on the left
+  wd.forEach((i_unused,i)=>{
+    const d=wd[i];
+    const cellRight = gridRight - i*COL;
+    const cx = cellRight - COL/2;
     const td=isToday(d);
-    if(td){ x.fillStyle='rgba(242,167,27,.16)';rr(x,cx-COL/2+4,headY+4,COL-8,headH-6,12);x.fill(); }
+    if(td){ x.fillStyle='rgba(242,167,27,.16)'; rr(x,cellRight-COL+6,headY+2,COL-12,headH-2,12); x.fill(); }
     x.textAlign='center';
-    x.fillStyle=td?'#F2A71B':'#F7EBD3';x.font='800 28px "Heebo",sans-serif';
+    x.fillStyle=td?'#F2A71B':'#F7EBD3';x.font='800 27px "Heebo",sans-serif';
     x.fillText(DAYS_HE[i],cx,headY+34);
     x.fillStyle=td?'#F2A71B':'#8C6E5A';x.font='600 18px "Heebo",sans-serif';
     x.fillText(fmt(d),cx,headY+57);
   });
 
-  // ---- shift rows ----
+  // shift rows
   SHIFTS.forEach((sh,si)=>{
     const y=sY+si*ROW;
-    // shift label block (right side)
-    x.fillStyle=sh.color;rr(x,W-LEFT+6,y+12,7,ROW-24,4);x.fill();
+    // shift-label block in the reserved LEFT column (right side of canvas)
+    x.fillStyle=sh.color; rr(x,W-18,y+14,7,ROW-28,4); x.fill();
     x.textAlign='right';
     x.fillStyle='#F7EBD3';x.font='800 30px "Heebo",sans-serif';
-    x.fillText(sh.label,W-26,y+ROW/2-6);
-    x.fillStyle=sh.color;x.font='700 20px "Heebo",sans-serif';
-    x.fillText(sh.time,W-26,y+ROW/2+24);
+    x.fillText(sh.label, W-34, y+ROW/2-4);
+    x.fillStyle=sh.color;x.font='700 19px "Heebo",sans-serif';
+    x.fillText(sh.time, W-34, y+ROW/2+26);
 
     wd.forEach((_,di)=>{
-      const cx=W-30-(di*COL)-COL;   // left edge of this day's cell
-      const pad=7;
-      // cell bg
-      x.fillStyle='#2E1A15';rr(x,cx+pad,y+pad,COL-pad*2,ROW-pad*2,16);x.fill();
+      const cellRight = gridRight - di*COL;
+      const cellLeft  = cellRight - COL;
+      const pad=8;
+      x.fillStyle='#2E1A15'; rr(x,cellLeft+pad,y+pad,COL-pad*2,ROW-pad*2,16); x.fill();
 
       const ids=getAssigned(di,sh.id);
       if(!ids.length){
         x.fillStyle='#5a4030';x.font='600 26px "Heebo",sans-serif';x.textAlign='center';
-        x.fillText('—',cx+COL/2,y+ROW/2+8);
+        x.fillText('—',cellLeft+COL/2,y+ROW/2+8);
       } else {
         const innerTop=y+pad+10, innerH=ROW-pad*2-16;
-        const ih=Math.min(58, innerH/ids.length);
-        const blockH=ih*ids.length;
-        const startY=innerTop+(innerH-blockH)/2;    // vertically center the names
+        const ih=Math.min(56, innerH/ids.length);
+        const startY=innerTop+(innerH-ih*ids.length)/2;
         ids.forEach((id,ii)=>{
           const e=getEmp(id);if(!e)return;
-          const ey=startY+ii*ih, ex=cx+pad+5, ew=COL-pad*2-10, bh=ih-7;
-          x.fillStyle=e.color;rr(x,ex,ey,ew,bh,11);x.fill();
-          // avatar circle
-          const r=bh/2-4, ac=ex+ew-r-8;
-          x.fillStyle='rgba(255,255,255,.28)';x.beginPath();x.arc(ac,ey+bh/2,r,0,Math.PI*2);x.fill();
-          x.fillStyle='#fff';x.font='800 '+Math.round(bh*0.42)+'px "Heebo",sans-serif';x.textAlign='center';
-          x.fillText(e.name[0],ac,ey+bh/2+Math.round(bh*0.15));
-          // name (full)
-          x.fillStyle='#fff';x.font='800 '+Math.min(24,Math.round(bh*0.42))+'px "Heebo",sans-serif';x.textAlign='right';
-          let nm=e.name; const maxw=ew-2*r-22;
-          while(x.measureText(nm).width>maxw && nm.length>2){ nm=nm.slice(0,-1); }
-          if(nm!==e.name) nm=nm.trim()+'…';
-          x.fillText(nm, ex+ew-2*r-16, ey+bh/2+Math.round(bh*0.15));
+          const ey=startY+ii*ih;
+          const ex=cellLeft+pad+5, ew=COL-pad*2-10, bh=ih-8;
+          x.fillStyle=e.color; rr(x,ex,ey,ew,bh,11); x.fill();
+          // avatar on the RIGHT side of pill (RTL start)
+          const r=bh/2-3, ac=ex+ew-r-9;
+          x.fillStyle='rgba(255,255,255,.30)';x.beginPath();x.arc(ac,ey+bh/2,r,0,Math.PI*2);x.fill();
+          x.fillStyle='#fff';x.font='800 '+Math.round(bh*0.4)+'px "Heebo",sans-serif';x.textAlign='center';
+          x.fillText(e.name[0],ac,ey+bh/2+Math.round(bh*0.14));
+          // name fills the rest, right-aligned starting just left of avatar
+          const nameRight = ex+ew-2*r-16;
+          const maxw = nameRight - ex - 10;
+          let nm=e.name, fs=Math.min(23,Math.round(bh*0.4));
+          x.font='800 '+fs+'px "Heebo",sans-serif';
+          while(x.measureText(nm).width>maxw && nm.length>1){ nm=nm.slice(0,-1); }
+          if(nm!==e.name){ nm=nm.replace(/\s+$/,'')+'…'; }
+          x.textAlign='right';x.fillStyle='#fff';
+          x.fillText(nm, nameRight, ey+bh/2+Math.round(bh*0.14));
         });
       }
     });
   });
 
-  // ---- footer ----
+  // footer
   x.fillStyle='#1c0f0c';x.fillRect(0,H-54,W,54);
-  x.fillStyle='#F2A71B';x.font='700 22px Anton,"Heebo",sans-serif';x.textAlign='center';
-  x.fillText('La Pampa Shifts',W/2-95,H-20);
-  x.fillStyle='#8C6E5A';x.font='600 18px "Heebo",sans-serif';
-  x.fillText('· The Story of Meat 🍔',W/2+70,H-20);
+  x.textAlign='center';
+  x.fillStyle='#F2A71B';x.font='700 22px Anton,"Heebo",sans-serif';
+  x.fillText('La Pampa Shifts  ·  The Story of Meat 🍔', W/2, H-20);
 
   return c.toDataURL('image/png');
 }
-// rounded-rect helper (fallback safe)
 function rr(x,a,b,w,h,r){ if(x.roundRect){x.beginPath();x.roundRect(a,b,w,h,r);} else {x.beginPath();x.rect(a,b,w,h);} }
 
 /* ── RENDER ── */
