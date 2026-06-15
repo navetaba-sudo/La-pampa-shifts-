@@ -573,22 +573,22 @@ function toggleAvail(e,d,s){if(!availability[e])availability[e]={};if(!availabil
 /* ── CANVAS IMAGE (La Pampa themed) ── */
 function drawImage(){
   const c=$('schedule-canvas'),dpr=window.devicePixelRatio||1;
-  const LEFT=210;                                  // shift-label column (right side)
-  const PADX=30;
-  const W=1480, H=240+SHIFTS.length*200+70;
+  const LEFT=210, PADX=30;
+  const COLW=210;                                  // fixed wide day columns
+  const W = PADX + COLW*7 + LEFT;                  // canvas grows to fit
+  const H = 240 + SHIFTS.length*210 + 70;
   c.width=W*dpr;c.height=H*dpr;c.style.width=W+'px';c.style.height=H+'px';
   const x=c.getContext('2d');x.scale(dpr,dpr);
   const wd=getWeekDates(weekOffset);
 
-  // ---- background ----
+  // background
   x.fillStyle='#241310';x.fillRect(0,0,W,H);
 
-  // ---- header band ----
+  // header band
   const HB=150;
   const g=x.createLinearGradient(0,0,0,HB);g.addColorStop(0,'#46241a');g.addColorStop(1,'#2c1813');
   x.fillStyle=g;x.fillRect(0,0,W,HB);
   x.fillStyle='#F2A71B';x.fillRect(0,0,W,7);
-
   x.direction='rtl';x.textAlign='right';
   x.fillStyle='#F7EBD3';x.font='800 50px Anton,"Heebo",sans-serif';
   x.fillText('LA PAMPA',W-PADX,66);
@@ -597,14 +597,12 @@ function drawImage(){
   x.fillStyle='#C7A98A';x.font='600 22px "Heebo",sans-serif';
   x.fillText(`${weekLabel(weekOffset)}  ·  ${fmt(wd[0])} – ${fmt(wd[6])}`,W-PADX,134);
 
-  // ---- layout: 7 day columns LEFT of the shift-label column ----
-  const gridRight = W - LEFT;                      // day grid ends here (right edge)
-  const gridLeft  = PADX;
-  const COL = (gridRight - gridLeft) / 7;
-  const headY=HB+10, headH=64, ROW=200, sY=headY+headH;
+  const gridRight = W - LEFT;
+  const COL = COLW;
+  const headY=HB+10, headH=64, ROW=210, sY=headY+headH;
 
-  // day headers — ראשון on the right, שבת on the left
-  wd.forEach((i_unused,i)=>{
+  // day headers
+  wd.forEach((_,i)=>{
     const d=wd[i];
     const cellRight = gridRight - i*COL;
     const cx = cellRight - COL/2;
@@ -617,11 +615,13 @@ function drawImage(){
     x.fillText(fmt(d),cx,headY+57);
   });
 
-  // shift rows
+  const NAME_FS = 22;        // FIXED uniform name size everywhere
+  const PILL_H  = 50;        // FIXED uniform pill height
+
   SHIFTS.forEach((sh,si)=>{
     const y=sY+si*ROW;
-    // shift-label block in the reserved LEFT column (right side of canvas)
-    x.fillStyle=sh.color; rr(x,W-18,y+14,7,ROW-28,4); x.fill();
+    // shift label (right column)
+    x.fillStyle=sh.color; rr(x,W-18,y+16,7,ROW-32,4); x.fill();
     x.textAlign='right';
     x.fillStyle='#F7EBD3';x.font='800 30px "Heebo",sans-serif';
     x.fillText(sh.label, W-34, y+ROW/2-4);
@@ -639,28 +639,38 @@ function drawImage(){
         x.fillStyle='#5a4030';x.font='600 26px "Heebo",sans-serif';x.textAlign='center';
         x.fillText('—',cellLeft+COL/2,y+ROW/2+8);
       } else {
-        const innerTop=y+pad+10, innerH=ROW-pad*2-16;
-        const ih=Math.min(56, innerH/ids.length);
-        const startY=innerTop+(innerH-ih*ids.length)/2;
-        ids.forEach((id,ii)=>{
+        const gap=8;
+        const blockH = ids.length*PILL_H + (ids.length-1)*gap;
+        let ey = y + (ROW-blockH)/2;
+        const cellInnerW = COL-pad*2-10;       // max pill width available
+        ids.forEach((id)=>{
           const e=getEmp(id);if(!e)return;
-          const ey=startY+ii*ih;
-          const ex=cellLeft+pad+5, ew=COL-pad*2-10, bh=ih-8;
-          x.fillStyle=e.color; rr(x,ex,ey,ew,bh,11); x.fill();
-          // avatar on the RIGHT side of pill (RTL start)
-          const r=bh/2-3, ac=ex+ew-r-9;
-          x.fillStyle='rgba(255,255,255,.30)';x.beginPath();x.arc(ac,ey+bh/2,r,0,Math.PI*2);x.fill();
-          x.fillStyle='#fff';x.font='800 '+Math.round(bh*0.4)+'px "Heebo",sans-serif';x.textAlign='center';
-          x.fillText(e.name[0],ac,ey+bh/2+Math.round(bh*0.14));
-          // name fills the rest, right-aligned starting just left of avatar
-          const nameRight = ex+ew-2*r-16;
-          const maxw = nameRight - ex - 10;
-          let nm=e.name, fs=Math.min(23,Math.round(bh*0.4));
-          x.font='800 '+fs+'px "Heebo",sans-serif';
-          while(x.measureText(nm).width>maxw && nm.length>1){ nm=nm.slice(0,-1); }
-          if(nm!==e.name){ nm=nm.replace(/\s+$/,'')+'…'; }
+          // measure full name at fixed size
+          x.font='800 '+NAME_FS+'px "Heebo",sans-serif';
+          const nameW = x.measureText(e.name).width;
+          const r = PILL_H/2-3;                 // avatar radius
+          // pill width = name + avatar + paddings, but never exceeds cell
+          let pillW = Math.min(cellInnerW, nameW + 2*r + 34);
+          const ex = cellRight - pad - 5 - pillW;   // right-align pill in cell
+          // pill
+          x.fillStyle=e.color; rr(x,ex,ey,pillW,PILL_H,12); x.fill();
+          // avatar (right side)
+          const ac = ex+pillW-r-9;
+          x.fillStyle='rgba(255,255,255,.30)';x.beginPath();x.arc(ac,ey+PILL_H/2,r,0,Math.PI*2);x.fill();
+          x.fillStyle='#fff';x.font='800 18px "Heebo",sans-serif';x.textAlign='center';
+          x.fillText(e.name[0],ac,ey+PILL_H/2+6);
+          // name — fixed size, truncate only if pill capped at cell width
+          const nameRight = ex+pillW-2*r-16;
+          const maxw = pillW-2*r-26;
+          let nm=e.name;
+          x.font='800 '+NAME_FS+'px "Heebo",sans-serif';
+          if(x.measureText(nm).width>maxw){
+            while(x.measureText(nm+'…').width>maxw && nm.length>1){ nm=nm.slice(0,-1); }
+            nm=nm.replace(/\s+$/,'')+'…';
+          }
           x.textAlign='right';x.fillStyle='#fff';
-          x.fillText(nm, nameRight, ey+bh/2+Math.round(bh*0.14));
+          x.fillText(nm, nameRight, ey+PILL_H/2+7);
+          ey += PILL_H+gap;
         });
       }
     });
