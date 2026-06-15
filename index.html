@@ -223,8 +223,9 @@ body::before{
 #final-title .accent{color:var(--mustard);}
 #final-sub{font-size:12px;color:var(--ink-faint);margin-top:3px;}
 #download-btn{
-  background:var(--ok);border-radius:13px;padding:11px 18px;color:#10220C;font-weight:800;font-size:13px;
+  background:var(--ok);border:none;border-radius:13px;padding:11px 18px;color:#10220C;font-weight:800;font-size:13px;
   text-decoration:none;display:none;align-items:center;gap:6px;transition:.15s;box-shadow:0 3px 12px rgba(111,174,90,.3);
+  cursor:pointer;font-family:inherit;
 }
 #download-btn:active{transform:scale(.96);}
 
@@ -420,7 +421,7 @@ body::before{
         <div id="final-title">📋 לוח <span class="accent">סופי</span></div>
         <div id="final-sub"></div>
       </div>
-      <a id="download-btn" href="#" download>⬇️ הורד תמונה</a>
+      <button id="download-btn">⬇️ שמור / שתף תמונה</button>
     </div>
     <div id="final-content"></div>
   </div>
@@ -758,9 +759,9 @@ function renderFinal(){
   const dl=$('download-btn');
   if(!isFinalized()){dl.style.display='none';
     $('final-content').innerHTML=`<div class="card empty-state"><div class="empty-ic">📋</div><div class="empty-tt">הלוח עדיין לא פורסם</div><div class="empty-sb">סיים לשבץ את המשמרות, ואז לחץ "פרסם ✓" כדי ליצור לוח מעוצב לשיתוף</div></div>`;return;}
-  dl.style.display='inline-flex';if(imgDataUrl){dl.href=imgDataUrl;dl.download=`לוח-משמרות-${weekLabel(weekOffset)}.jpg`;}
+  dl.style.display='inline-flex';
   let h='';
-  if(imgDataUrl)h+=`<div class="card" id="img-wrap"><div id="img-head"><span>📸 תמונה לשיתוף בוואטסאפ</span><button id="regen-btn">רענן</button></div><img id="schedule-img" src="${imgDataUrl}" alt="לוח"/><div id="img-hint">לחץ "הורד תמונה" למעלה, ואז שלח לקבוצת העובדים</div></div>`;
+  if(imgDataUrl)h+=`<div class="card" id="img-wrap"><div id="img-head"><span>📸 תמונה לשיתוף בוואטסאפ</span><button id="regen-btn">רענן</button></div><img id="schedule-img" src="${imgDataUrl}" alt="לוח"/><div id="img-hint">לחיצה ארוכה על התמונה ← "שמור תמונה", או לחצן "שמור / שתף" למעלה</div></div>`;
   h+='<div class="day-cards">';
   wd.forEach((d,di)=>{const has=SHIFTS.some(s=>getAssigned(di,s.id).length>0);
     h+=`<div class="card fade-in" style="${has?'':'opacity:.45'}"><div class="day-head"><span class="day-label ${isToday(d)?'today':''}">${DAYS_HE[di]}</span><span class="day-date">${fmt(d)}</span>${!has?'<span class="day-noshift">· ללא משמרות</span>':''}</div><div class="shift-cards">`;
@@ -807,6 +808,34 @@ $('unpublish-btn').onclick=()=>{
   renderAll();cloudSave();toast('הלוח פתוח לעריכה');
 };
 $('gear-btn').onclick=()=>{renderEmpManage();$('emp-manage-modal').classList.add('open');};
+
+// share / save the schedule image — robust on mobile + desktop
+async function dataUrlToBlob(dataUrl){ const res=await fetch(dataUrl); return await res.blob(); }
+document.addEventListener('click', async (ev)=>{
+  if(!ev.target.closest('#download-btn')) return;
+  if(!imgDataUrl) return;
+  const fname=`לוח-משמרות-${weekLabel(weekOffset)}.jpg`;
+  try{
+    const blob = await dataUrlToBlob(imgDataUrl);
+    const file = new File([blob], fname, {type:'image/jpeg'});
+    // 1) native share sheet (best on iOS/Android — save to photos or send to WhatsApp)
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({ files:[file], title:'לוח משמרות' });
+      return;
+    }
+    // 2) desktop / fallback — trigger a real download via blob URL
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=fname;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+  }catch(err){
+    console.error('share/download failed',err);
+    // 3) last resort — open image in new tab so user can long-press save
+    const w=window.open();
+    if(w){ w.document.write(`<img src="${imgDataUrl}" style="width:100%">`); }
+    else toast('לחיצה ארוכה על התמונה כדי לשמור');
+  }
+});
 $('close-emp-manage').onclick=()=>$('emp-manage-modal').classList.remove('open');
 $('emp-manage-modal').addEventListener('click',e=>{if(e.target===$('emp-manage-modal'))$('emp-manage-modal').classList.remove('open');});
 $('emp-manage-list').addEventListener('click',e=>{const b=e.target.closest('.em-del');if(!b)return;
