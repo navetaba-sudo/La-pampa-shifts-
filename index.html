@@ -475,7 +475,7 @@ body::before{
 <script type="module">
 // ════════════ FIREBASE ════════════
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyASnhdtgX1kzj7cSdT7JYA1T2OvOTis_Lo",
@@ -491,6 +491,7 @@ const DOC_REF = doc(db, "appdata", "main");
 
 let saveTimer = null;
 let cloudReady = false;
+
 function cloudSave(){
   if(!cloudReady) return;
   clearTimeout(saveTimer);
@@ -502,21 +503,23 @@ function cloudSave(){
       console.error('save failed',err);
       const d=$('save-dot'); if(d){ d.className='error'; d.title='שגיאת שמירה'; }
     }
-  }, 600);
+  }, 800);
 }
+
 async function cloudLoad(){
   try{
     const snap = await getDoc(DOC_REF);
     if(snap.exists()){
       const d = snap.data();
-      if(d.employees) employees = d.employees;
+      if(d.employees)    employees    = d.employees;
       if(d.availability) availability = d.availability;
-      if(d.schedule) schedule = d.schedule;
-      if(d.finalized) finalized = d.finalized;
+      if(d.schedule)     schedule     = d.schedule;
+      if(d.finalized)    finalized    = d.finalized;
     }
   }catch(err){ console.error('load failed',err); }
   cloudReady = true;
   renderAll();
+  const dot=$('save-dot'); if(dot){ dot.className='saved'; dot.title='מסונכרן'; }
 }
 
 const DAYS_HE=["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
