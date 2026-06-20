@@ -410,7 +410,10 @@ body::before{
 
   <div id="view-availability" class="view">
     <div class="view-title">זמינות <span class="accent">עובדים</span></div>
-    <div class="view-sub">בחר עובד וסמן את המשמרות שבהן הוא יכול לעבוד השבוע.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+      <div class="view-sub" style="margin:0">בחר עובד וסמן את המשמרות שבהן הוא יכול לעבוד השבוע.</div>
+      <button id="reset-all-btn" class="btn-danger-sm" style="white-space:nowrap">🗑 אפס זמינות לכולם</button>
+    </div>
     <div class="emp-chips" id="avail-chips"></div>
     <div id="avail-grid-wrap"></div>
   </div>
@@ -459,7 +462,19 @@ body::before{
   </div>
 </div>
 
-<!-- CONFIRM DELETE -->
+<!-- CONFIRM ACTION MODAL -->
+<div class="modal-overlay" id="confirm-action-modal">
+  <div class="modal-box" style="max-width:340px;text-align:center">
+    <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+    <div id="ca-msg" style="font-size:16px;font-weight:700;color:var(--cream);margin-bottom:8px"></div>
+    <div style="font-size:12px;color:var(--ink-dim);margin-bottom:20px">פעולה זו לא ניתנת לביטול</div>
+    <div class="btn-row">
+      <button class="btn-danger" id="ca-yes">כן, אפס</button>
+      <button class="btn-ghost" id="ca-no">ביטול</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="confirm-delete-modal">
   <div class="modal-box" style="max-width:360px">
     <div id="cd-av"></div>
@@ -569,7 +584,31 @@ function totalAssigned(e){return Object.values(getWeekSched()).filter(a=>a.inclu
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);}
 
 function toggleAssign(e,d,s){if(isFinalized())return;e=Number(e);if(!schedule[weekOffset])schedule[weekOffset]={};const k=cellKey(d,s),c=(schedule[weekOffset][k]||[]).map(Number);schedule[weekOffset][k]=c.includes(e)?c.filter(x=>x!==e):[...c,e];renderAll();cloudSave();}
-function toggleAvail(e,d,s){if(!availability[e])availability[e]={};if(!availability[e][weekOffset])availability[e][weekOffset]={};const k=cellKey(d,s);if(availability[e][weekOffset][k])delete availability[e][weekOffset][k];else availability[e][weekOffset][k]=true;renderAll();cloudSave();}
+function resetAvailEmployee(empId){
+  if(availability[empId]) availability[empId][weekOffset]={};
+  renderAvail(); renderHeader(); cloudSave();
+  toast('זמינות אופסה ✓');
+}
+function resetAvailAll(){
+  employees.forEach(e=>{ if(availability[e.id]) availability[e.id][weekOffset]={}; });
+  renderAvail(); renderHeader(); cloudSave();
+  toast('זמינות כל העובדים אופסה ✓');
+}
+
+function toggleAvail(e,d,s){
+  if(!availability[e])availability[e]={};
+  if(!availability[e][weekOffset])availability[e][weekOffset]={};
+  const k=cellKey(d,s);
+  if(availability[e][weekOffset][k])delete availability[e][weekOffset][k];
+  else availability[e][weekOffset][k]=true;
+  // preserve scroll position — only re-render avail grid, not entire page
+  const wrap=$('avail-grid-wrap');
+  const scrollX=wrap?wrap.scrollLeft:0;
+  renderAvail();
+  if(wrap) wrap.scrollLeft=scrollX;
+  renderHeader();
+  cloudSave();
+}
 
 /* ── CANVAS IMAGE (La Pampa themed) ── */
 function drawImage(){
@@ -741,7 +780,7 @@ function renderAvail(){
   const w=$('avail-grid-wrap');
   if(!selectedAvailEmp){w.innerHTML=`<div class="card empty-state"><div class="empty-ic">👆</div><div class="empty-tt">בחר עובד</div><div class="empty-sb">לחץ על עובד למעלה כדי לעדכן את הזמינות שלו לשבוע זה</div></div>`;return;}
   const e=getEmp(selectedAvailEmp);
-  let h=`<div class="card"><div style="font-weight:800;color:${e.color};margin-bottom:14px;font-size:16px;display:flex;align-items:center;gap:9px"><div class="chip-av" style="background:${e.color}33;border:2px solid ${e.color};color:${e.color}">${e.name[0]}</div>${e.name} — מתי זמין?</div><div class="tbl-scroll"><table class="avail-table"><thead><tr><th class="shift-col"></th>`;
+  let h=`<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px"><div style="font-weight:800;color:${e.color};font-size:16px;display:flex;align-items:center;gap:9px"><div class="chip-av" style="background:${e.color}33;border:2px solid ${e.color};color:${e.color}">${e.name[0]}</div>${e.name} — מתי זמין?</div><button class="btn-danger-sm emp-reset-btn" data-emp-id="${e.id}">🗑 אפס עובד זה</button></div><div class="tbl-scroll"><table class="avail-table"><thead><tr><th class="shift-col"></th>`;
   wd.forEach((d,i)=>{h+=`<th><span class="th-day-name ${isToday(d)?'today':''}" style="font-size:12px">${DAYS_HE[i]}</span><span class="th-day-date">${fmt(d)}</span></th>`;});
   h+='</tr></thead><tbody>';
   SHIFTS.forEach(sh=>{h+=`<tr><td class="shift-rowhead"><div class="shift-chip"><div class="shift-bar" style="background:${sh.color};height:28px"></div><div><div class="shift-name" style="font-size:13px">${sh.label}</div><div class="shift-time">${sh.time}</div></div></div></td>`;
@@ -809,40 +848,29 @@ $('unpublish-btn').onclick=()=>{
 };
 $('gear-btn').onclick=()=>{renderEmpManage();$('emp-manage-modal').classList.add('open');};
 
-// share / save the schedule image — robust on mobile + desktop
-async function dataUrlToBlob(dataUrl){ const res=await fetch(dataUrl); return await res.blob(); }
-document.addEventListener('click', async (ev)=>{
-  if(!ev.target.closest('#download-btn')) return;
-  if(!imgDataUrl) return;
-  const fname=`לוח-משמרות-${weekLabel(weekOffset)}.jpg`;
-  try{
-    const blob = await dataUrlToBlob(imgDataUrl);
-    const file = new File([blob], fname, {type:'image/jpeg'});
-    // 1) native share sheet (best on iOS/Android — save to photos or send to WhatsApp)
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({ files:[file], title:'לוח משמרות' });
-      return;
-    }
-    // 2) desktop / fallback — trigger a real download via blob URL
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download=fname;
-    document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),3000);
-  }catch(err){
-    console.error('share/download failed',err);
-    // 3) last resort — open image in new tab so user can long-press save
-    const w=window.open();
-    if(w){ w.document.write(`<img src="${imgDataUrl}" style="width:100%">`); }
-    else toast('לחיצה ארוכה על התמונה כדי לשמור');
+
+$('download-btn').onclick = function(){
+  if(!imgDataUrl){ toast('אין תמונה — פרסם קודם'); return; }
+  const w = window.open('', '_blank');
+  if(w){
+    w.document.write('<html><head><meta charset="UTF-8"><title>לוח משמרות</title></head><body style="margin:0;background:#000"><img src="'+imgDataUrl+'" style="width:100%;display:block"></body></html>');
+    w.document.close();
+    toast('לחיצה ארוכה על התמונה ← שמור 💾');
+  } else {
+    toast('אפשר לשמור ← לחיצה ארוכה על התמונה למטה');
   }
-});
+};
 $('close-emp-manage').onclick=()=>$('emp-manage-modal').classList.remove('open');
 $('emp-manage-modal').addEventListener('click',e=>{if(e.target===$('emp-manage-modal'))$('emp-manage-modal').classList.remove('open');});
 $('emp-manage-list').addEventListener('click',e=>{const b=e.target.closest('.em-del');if(!b)return;
   pendingDeleteId=parseInt(b.dataset.id);const nm=b.dataset.name,co=b.dataset.color;
   const av=$('cd-av');av.style.cssText=`width:62px;height:62px;border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;background:${co}2e;border:2px solid ${co};color:${co}`;av.textContent=nm[0];
   $('cd-nm').textContent=nm;$('confirm-delete-modal').classList.add('open');});
-$('cd-yes').onclick=()=>{if(!pendingDeleteId)return;const e=getEmp(pendingDeleteId);employees=employees.filter(x=>x.id!==pendingDeleteId);delete availability[pendingDeleteId];if(selectedAvailEmp===pendingDeleteId)selectedAvailEmp=null;pendingDeleteId=null;$('confirm-delete-modal').classList.remove('open');renderAll();cloudSave();toast('העובד נמחק');};
+$('ca-yes').onclick=()=>{ $('confirm-action-modal').classList.remove('open'); if(_confirmCb){_confirmCb();_confirmCb=null;} };
+$('ca-no').onclick=()=>{ $('confirm-action-modal').classList.remove('open'); _confirmCb=null; };
+$('confirm-action-modal').addEventListener('click',e=>{ if(e.target===$('confirm-action-modal')){ $('confirm-action-modal').classList.remove('open'); _confirmCb=null; } });
+
+$('cd-yes').onclick=()=>{if(!pendingDeleteId)return;employees=employees.filter(x=>x.id!==pendingDeleteId);delete availability[pendingDeleteId];if(selectedAvailEmp===pendingDeleteId)selectedAvailEmp=null;pendingDeleteId=null;$('confirm-delete-modal').classList.remove('open');renderAll();cloudSave();toast('העובד נמחק');};
 $('cd-no').onclick=()=>{pendingDeleteId=null;$('confirm-delete-modal').classList.remove('open');};
 $('confirm-delete-modal').addEventListener('click',e=>{if(e.target===$('confirm-delete-modal')){pendingDeleteId=null;$('confirm-delete-modal').classList.remove('open');}});
 $('open-add-emp-btn').onclick=()=>{$('emp-manage-modal').classList.remove('open');$('new-emp-name').value='';$('add-emp-modal').classList.add('open');setTimeout(()=>$('new-emp-name').focus(),100);};
@@ -850,11 +878,21 @@ $('cancel-add-emp').onclick=()=>$('add-emp-modal').classList.remove('open');
 $('add-emp-modal').addEventListener('click',e=>{if(e.target===$('add-emp-modal'))$('add-emp-modal').classList.remove('open');});
 $('confirm-add-emp').onclick=addEmp;
 $('new-emp-name').addEventListener('keydown',e=>{if(e.key==='Enter')addEmp();});
+// lightweight confirm helper
+let _confirmCb=null;
+function confirmAction(msg, cb){
+  _confirmCb=cb;
+  $('ca-msg').textContent=msg;
+  $('confirm-action-modal').classList.add('open');
+}
+
 function addEmp(){const nm=$('new-emp-name').value.trim();if(!nm){toast('הכנס שם עובד');return;}const role=$('new-emp-role').value;const color=EMP_COLORS[employees.length%EMP_COLORS.length];employees.push({id:Date.now(),name:nm,role,color});$('add-emp-modal').classList.remove('open');renderAll();cloudSave();toast(`${nm} נוסף/ה`);}
 $('main').addEventListener('click',e=>{
   const p=e.target.closest('.pill');if(p&&!isFinalized()){toggleAssign(parseInt(p.dataset.emp),parseInt(p.dataset.day),p.dataset.shift);return;}
   const c=e.target.closest('[data-av-emp]');if(c){const id=parseInt(c.dataset.avEmp);selectedAvailEmp=selectedAvailEmp===id?null:id;renderAvail();return;}
   const cl=e.target.closest('.avail-cell');if(cl&&selectedAvailEmp!==null){toggleAvail(selectedAvailEmp,parseInt(cl.dataset.avDay),cl.dataset.avShift);return;}
+  const er=e.target.closest('.emp-reset-btn');if(er){const eid=parseInt(er.dataset.empId);confirmAction('לאפס את הזמינות של '+((getEmp(eid)||{}).name||'')+'?',()=>resetAvailEmployee(eid));return;}
+  const ra=e.target.closest('#reset-all-btn');if(ra){confirmAction('לאפס את הזמינות של כל העובדים לשבוע זה?',resetAvailAll);return;}
 });
 const rs=$('new-emp-role');ROLES.forEach(r=>{const o=document.createElement('option');o.textContent=r;rs.appendChild(o);});
 renderAll();   // render immediately with defaults
