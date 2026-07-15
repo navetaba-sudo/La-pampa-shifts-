@@ -575,37 +575,31 @@ function toggleAssign(eId,dayIdx,shiftId,roleId){
 }
 
 function toggleAvail(eId,dayIdx,shiftId){
-  const d=getData();const k=`${dayIdx}-${shiftId}`;
+  const d=getData();
+  const k=`${dayIdx}-${shiftId}`;
   if(!d.availability[eId])d.availability[eId]={};
   if(!d.availability[eId][weekOffset])d.availability[eId][weekOffset]={};
-  if(d.availability[eId][weekOffset][k])delete d.availability[eId][weekOffset][k];
+  const wasOn=!!d.availability[eId][weekOffset][k];
+  if(wasOn)delete d.availability[eId][weekOffset][k];
   else d.availability[eId][weekOffset][k]=true;
-  // capture scroll before any DOM change
-  const wrap=$('avail-grid-wrap');
-  const sx=wrap?wrap.scrollLeft:0;
-  const sy=window.pageYOffset;
-  // re-render only the avail grid content (not the whole page)
-  renderAvailGridOnly();
-  // restore scroll synchronously right after DOM update
-  if(wrap)wrap.scrollLeft=sx;
-  window.scrollTo({top:sy,behavior:'instant'});
+  const nowOn=!wasOn;
+  // find this exact cell and update it directly — zero re-render
+  const emp=getData().employees.find(x=>x.id===eId);
+  const cell=document.querySelector(`.avail-cell[data-av-day="${dayIdx}"][data-av-shift="${shiftId}"]`);
+  if(cell&&emp){
+    if(nowOn){
+      cell.style.background=`${emp.color}2e`;
+      cell.style.borderColor=emp.color;
+      cell.style.color=emp.color;
+      cell.textContent='✓';
+    }else{
+      cell.style.background='';
+      cell.style.borderColor='';
+      cell.style.color='';
+      cell.textContent='';
+    }
+  }
   cloudSave();
-}
-
-function renderAvailGridOnly(){
-  // re-render just the avail-cell checkmarks without touching chips or page structure
-  if(!selectedAvailEmp)return;
-  const biz=getBiz(),wd=getWeekDates(weekOffset);
-  const e=getData().employees.find(x=>x.id===selectedAvailEmp);if(!e)return;
-  document.querySelectorAll('.avail-cell').forEach(cell=>{
-    const di=parseInt(cell.dataset.avDay);
-    const sh=cell.dataset.avShift;
-    const a=isAvailable(selectedAvailEmp,di,sh);
-    cell.style.background=a?`${e.color}2e`:'';
-    cell.style.borderColor=a?e.color:'';
-    cell.style.color=a?e.color:'';
-    cell.textContent=a?'✓':'';
-  });
 }
 
 function resetAvailEmployee(eId){
@@ -1078,7 +1072,12 @@ $('main').addEventListener('click',e=>{
   const chip=e.target.closest('[data-av-emp]');
   if(chip){const id=parseInt(chip.dataset.avEmp);selectedAvailEmp=selectedAvailEmp===id?null:id;renderAvail();return;}
   const cell=e.target.closest('.avail-cell');
-  if(cell&&selectedAvailEmp!==null){toggleAvail(selectedAvailEmp,parseInt(cell.dataset.avDay),cell.dataset.avShift);return;}
+  if(cell&&selectedAvailEmp!==null){
+    e.preventDefault();
+    e.stopPropagation();
+    toggleAvail(selectedAvailEmp,parseInt(cell.dataset.avDay),cell.dataset.avShift);
+    return;
+  }
   const er=e.target.closest('.emp-reset-btn');
   if(er){const eid=parseInt(er.dataset.empId);confirmAction('לאפס את הזמינות של '+((getEmp(eid)||{}).name||'')+'?',()=>resetAvailEmployee(eid));return;}
   const ra=e.target.closest('#reset-all-btn');
