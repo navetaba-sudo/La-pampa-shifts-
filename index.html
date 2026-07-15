@@ -580,15 +580,32 @@ function toggleAvail(eId,dayIdx,shiftId){
   if(!d.availability[eId][weekOffset])d.availability[eId][weekOffset]={};
   if(d.availability[eId][weekOffset][k])delete d.availability[eId][weekOffset][k];
   else d.availability[eId][weekOffset][k]=true;
-  // save both scroll positions before re-render
+  // capture scroll before any DOM change
   const wrap=$('avail-grid-wrap');
   const sx=wrap?wrap.scrollLeft:0;
-  const sy=window.scrollY||document.documentElement.scrollTop;
-  renderAvail();
+  const sy=window.pageYOffset;
+  // re-render only the avail grid content (not the whole page)
+  renderAvailGridOnly();
+  // restore scroll synchronously right after DOM update
   if(wrap)wrap.scrollLeft=sx;
-  // restore vertical scroll after browser repaints
-  requestAnimationFrame(()=>window.scrollTo(0,sy));
-  renderHeader();cloudSave();
+  window.scrollTo({top:sy,behavior:'instant'});
+  cloudSave();
+}
+
+function renderAvailGridOnly(){
+  // re-render just the avail-cell checkmarks without touching chips or page structure
+  if(!selectedAvailEmp)return;
+  const biz=getBiz(),wd=getWeekDates(weekOffset);
+  const e=getData().employees.find(x=>x.id===selectedAvailEmp);if(!e)return;
+  document.querySelectorAll('.avail-cell').forEach(cell=>{
+    const di=parseInt(cell.dataset.avDay);
+    const sh=cell.dataset.avShift;
+    const a=isAvailable(selectedAvailEmp,di,sh);
+    cell.style.background=a?`${e.color}2e`:'';
+    cell.style.borderColor=a?e.color:'';
+    cell.style.color=a?e.color:'';
+    cell.textContent=a?'✓':'';
+  });
 }
 
 function resetAvailEmployee(eId){
