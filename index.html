@@ -59,27 +59,43 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 /* ── HEADER ── */
 #header{
   position:sticky;top:0;z-index:60;
-  background:linear-gradient(180deg,rgba(46,26,21,.96),rgba(36,19,16,.92));
+  background:rgba(36,19,16,.97);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
   border-bottom:1px solid var(--line);
-  padding:calc(env(safe-area-inset-top)+8px) 12px 8px;
+  padding:10px 14px;
+  padding-top:calc(env(safe-area-inset-top) + 10px);
   display:none;
 }
-#header-inner{max-width:1000px;margin:0 auto;display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow:hidden;}
-#back-btn{background:var(--panel);border:1px solid var(--line);color:var(--cream);border-radius:10px;padding:7px 10px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;transition:.15s;flex-shrink:0;white-space:nowrap;}
-#back-btn:active{transform:scale(.96);}
-#header-brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1;}
-#header-logo{width:34px;height:34px;min-width:34px;border-radius:8px;border:1px solid rgba(255,255,255,.15);flex-shrink:0;background:#1a0f0a;background-size:cover;background-position:center;display:block;}
-#header-logo.text-logo{display:flex;align-items:center;justify-content:center;font-family:'Anton',sans-serif;font-size:8px;letter-spacing:.3px;color:var(--cream);text-align:center;line-height:1.2;}
-#header-biz-name{font-family:'Anton',sans-serif;font-size:15px;color:var(--cream);letter-spacing:.5px;white-space:nowrap;}
-#header-biz-name b{color:var(--accent);}
-#header-emp-count{font-size:9px;color:var(--ink-faint);margin-top:1px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
+#header-inner{
+  display:flex;align-items:center;gap:8px;
+  max-width:1000px;margin:0 auto;
+}
+#back-btn{
+  background:var(--panel);border:1px solid var(--line);color:var(--cream);
+  border-radius:9px;padding:6px 10px;cursor:pointer;font-size:13px;font-weight:700;
+  font-family:inherit;flex-shrink:0;
+}
+#header-logo{
+  width:32px;height:32px;min-width:32px;border-radius:8px;
+  background:#1a0f0a;background-size:cover;background-position:center;
+  flex-shrink:0;border:1px solid rgba(255,255,255,.15);
+}
+#header-biz-name{
+  font-family:'Anton',sans-serif;font-size:16px;color:var(--accent);
+  letter-spacing:.5px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
 #save-dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex-shrink:0;transition:.3s;}
-#save-dot.saved{background:var(--ok);box-shadow:0 0 8px rgba(111,174,90,.5);}
+#save-dot.saved{background:var(--ok);}
 #save-dot.error{background:var(--danger);}
-#gear-btn{background:var(--panel);border:1px solid var(--line);color:var(--cream);border-radius:10px;padding:7px 10px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;display:flex;align-items:center;gap:4px;transition:.15s;flex-shrink:0;white-space:nowrap;}
-#gear-btn:active{transform:scale(.96);}
-#settings-btn{background:var(--panel);border:1px solid var(--line);color:var(--ink-dim);border-radius:10px;padding:7px 9px;cursor:pointer;font-size:15px;line-height:1;transition:.15s;flex-shrink:0;}
+#settings-btn{
+  background:var(--panel);border:1px solid var(--line);color:var(--ink-dim);
+  border-radius:9px;padding:6px 9px;cursor:pointer;font-size:14px;flex-shrink:0;
+}
+#gear-btn{
+  background:var(--accent);border:none;color:var(--burgundy);
+  border-radius:9px;padding:6px 12px;cursor:pointer;font-size:14px;font-weight:800;
+  font-family:inherit;flex-shrink:0;
+}
 
 /* ── WEEK STRIP ── */
 #weekstrip{background:var(--bg-2);border-bottom:1px solid var(--line-soft);padding:10px 16px;display:none;}
@@ -257,16 +273,11 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 <header id="header">
   <div id="header-inner">
     <button id="back-btn">← חזור</button>
-    <div id="header-brand">
-      <div id="header-logo"></div>
-      <div>
-        <div id="header-biz-name"></div>
-        <div id="header-emp-count"></div>
-      </div>
-    </div>
+    <div id="header-logo"></div>
+    <div id="header-biz-name"></div>
     <span id="save-dot" title="טוען..."></span>
     <button id="settings-btn" title="הגדרות">⚙️</button>
-    <button id="gear-btn">👥 עובדים</button>
+    <button id="gear-btn">👥</button>
   </div>
 </header>
 
@@ -664,7 +675,7 @@ function renderHeader(){
   hl.style.cssText=`width:40px;height:40px;border-radius:10px;border:1px solid ${biz.accentColor}44;flex-shrink:0;overflow:hidden;background:#1a0f0a;display:block;`;
   setLogoEl(hl,biz);
   $('header-biz-name').innerHTML=biz.name;
-  $('header-emp-count').textContent=`SHIFTS · ${d.employees.length} עובדים`;
+
   const wd=getWeekDates(weekOffset);
   $('week-label-main').textContent=weekLabel(weekOffset);
   $('week-label-sub').textContent=`${fmt(wd[0])}–${fmt(wd[6])}`;
