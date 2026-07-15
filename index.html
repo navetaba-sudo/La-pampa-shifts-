@@ -557,12 +557,17 @@ function fmt(d){return `${d.getDate()}/${d.getMonth()+1}`;}
 function isToday(d){const t=new Date();return d.getDate()===t.getDate()&&d.getMonth()===t.getMonth()&&d.getFullYear()===t.getFullYear();}
 function weekLabel(o){if(o===0)return"השבוע הנוכחי";if(o===1)return"השבוע הבא";if(o===-1)return"השבוע שעבר";const w=getWeekDates(o);return `${fmt(w[0])} – ${fmt(w[6])}`;}
 function cellKey(d,s,r){return `${d}-${s}-${r}`;}
-function getWeekSched(){return getData().schedule[weekOffset]||{};}
+function getWeekSched(){const s=getData().schedule||{};return s[weekOffset]||s[String(weekOffset)]||{};}
 function getAssigned(d,s,r){return(getWeekSched()[cellKey(d,s,r)]||[]);}
 function isAvailable(eId,d,s){return !!((getData().availability[eId]||{})[weekOffset]||{})[`${d}-${s}`];}
 function isFinalized(){const f=getData().finalized;return !!(f[weekOffset]||f[String(weekOffset)]);}
 function getEmp(id){return getData().employees.find(e=>e.id===id);}
-function totalAssigned(eId){return Object.values(getWeekSched()).filter(a=>a.includes(eId)).length;}
+function totalAssigned(eId){
+  // check current week with both number and string key (Firestore converts keys to strings)
+  const sched=getData().schedule||{};
+  const week=sched[weekOffset]||sched[String(weekOffset)]||{};
+  return Object.values(week).filter(a=>Array.isArray(a)&&a.map(Number).includes(Number(eId))).length;
+}
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);}
 
 function toggleAssign(eId,dayIdx,shiftId,roleId){
