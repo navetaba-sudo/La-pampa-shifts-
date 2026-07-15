@@ -46,8 +46,9 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 }
 .biz-card:active{transform:scale(.97);}
 .biz-card:hover{border-color:var(--accent);}
-.biz-logo{width:56px;height:56px;border-radius:13px;object-fit:cover;border:1.5px solid rgba(255,255,255,.15);flex-shrink:0;background:#1a0f0a;}
-.biz-logo.text-logo{display:flex;align-items:center;justify-content:center;font-family:'Anton',sans-serif;font-size:11px;letter-spacing:.5px;color:var(--cream);text-align:center;line-height:1.2;}
+.biz-logo{width:64px;height:64px;min-width:64px;border-radius:13px;overflow:hidden;border:1.5px solid rgba(255,255,255,.15);flex-shrink:0;background:#1a0f0a;display:flex;align-items:center;justify-content:center;}
+.biz-logo img{width:100%;height:100%;object-fit:cover;display:block;}
+.biz-logo.text-logo{font-family:'Anton',sans-serif;font-size:11px;letter-spacing:.5px;color:var(--cream);text-align:center;line-height:1.2;}
 .biz-info{min-width:0;}
 .biz-name{font-family:'Anton',sans-serif;font-size:20px;color:var(--cream);letter-spacing:.5px;}
 .biz-desc{font-size:12px;color:var(--ink-faint);margin-top:3px;}
@@ -485,7 +486,7 @@ const $=id=>document.getElementById(id);
 // ════════════════════════════════════════════════
 // FIREBASE
 // ════════════════════════════════════════════════
-function docRef(){return doc(db,"shifts_app","data");}
+function docRef(){return doc(db,"appdata","main");}
 
 async function cloudSave(){
   if(!cloudReady)return;
@@ -597,14 +598,14 @@ function confirmAction(msg,cb){_confirmCb=cb;$('ca-msg').textContent=msg;$('conf
 function setLogoEl(el,biz){
   if(!el)return;
   el.innerHTML='';
-  el.className=el.id||el.className.split(' ')[0];
-  if(biz.logoType==='img'){
-    const img=document.createElement('img');
-    img.src=biz.logoSrc;img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:inherit;';
-    img.onerror=()=>{el.classList.add('text-logo');el.innerHTML=biz.name.substring(0,6);img.remove();};
-    el.appendChild(img);
+  el.classList.remove('text-logo');
+  if(biz.logoType==='img'&&biz.logoSrc){
+    el.style.backgroundImage=`url('${biz.logoSrc}')`;
+    el.style.backgroundSize='cover';
+    el.style.backgroundPosition='center';
   }else{
     el.classList.add('text-logo');
+    el.style.backgroundImage='';
     el.textContent=biz.name.substring(0,6);
   }
 }
@@ -667,7 +668,9 @@ function renderAll(){renderHeader();renderEmpManage();renderAssign();renderAvail
 
 function renderHeader(){
   const biz=getBiz(),d=getData();
-  const hl=$('header-logo');setLogoEl(hl,biz);hl.style.cssText=`width:40px;height:40px;border-radius:10px;border:1px solid ${biz.accentColor}44;flex-shrink:0;overflow:hidden;background:#1a0f0a;`;
+  const hl=$('header-logo');
+  hl.style.cssText=`width:40px;height:40px;border-radius:10px;border:1px solid ${biz.accentColor}44;flex-shrink:0;overflow:hidden;background:#1a0f0a;display:block;`;
+  setLogoEl(hl,biz);
   $('header-biz-name').innerHTML=biz.name;
   $('header-emp-count').textContent=`SHIFTS · ${d.employees.length} עובדים`;
   const wd=getWeekDates(weekOffset);
