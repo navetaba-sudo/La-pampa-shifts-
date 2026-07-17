@@ -215,6 +215,12 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 .modal-title{font-family:'Anton',sans-serif;font-size:19px;color:var(--cream);letter-spacing:.5px;}
 .modal-x{background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);font-size:18px;cursor:pointer;line-height:1;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;}
 .form-label{font-size:12px;color:var(--ink-dim);display:block;margin-bottom:6px;font-weight:600;}
+.role-check-row{display:flex;align-items:center;gap:10px;background:var(--bg-2);border:1.5px solid var(--line);border-radius:10px;padding:10px 13px;cursor:pointer;transition:.15s;}
+.role-check-row.selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);}
+.role-check-row input{display:none;}
+.role-check-icon{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;transition:.15s;}
+.role-check-row.selected .role-check-icon{background:var(--accent);border-color:var(--accent);color:var(--burgundy);}
+.role-check-label{font-size:14px;font-weight:700;color:var(--cream);}
 .form-input,.form-select{width:100%;background:var(--bg-2);border:1.5px solid var(--line);border-radius:11px;padding:11px 13px;color:var(--ink);font-size:15px;direction:rtl;font-family:inherit;transition:.15s;}
 .form-input:focus,.form-select:focus{outline:none;border-color:var(--accent);}
 .form-group{margin-bottom:14px;}
@@ -351,13 +357,16 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   </div>
 </div>
 
-<!-- Add Employee -->
+<!-- Add / Edit Employee -->
 <div class="modal-overlay" id="add-emp-modal">
   <div class="modal-box">
-    <div class="modal-title" style="margin-bottom:18px">הוספת עובד</div>
+    <div id="add-emp-title" class="modal-title" style="margin-bottom:18px">הוספת עובד</div>
     <div class="form-group"><label class="form-label">שם מלא</label><input class="form-input" id="new-emp-name" placeholder="לדוגמה: משה לוי"/></div>
-    <div class="form-group"><label class="form-label">תפקיד</label><select class="form-select" id="new-emp-role"></select></div>
-    <div class="btn-row"><button class="btn-primary" id="confirm-add-emp">הוסף</button><button class="btn-ghost" id="cancel-add-emp">ביטול</button></div>
+    <div class="form-group">
+      <label class="form-label">תפקידים (ניתן לבחור כמה)</label>
+      <div id="role-checkboxes" style="display:flex;flex-direction:column;gap:8px;margin-top:4px"></div>
+    </div>
+    <div class="btn-row"><button class="btn-primary" id="confirm-add-emp">שמור</button><button class="btn-ghost" id="cancel-add-emp">ביטול</button></div>
   </div>
 </div>
 
@@ -673,9 +682,7 @@ function openBiz(bizId){
   $('weekstrip').style.display='block';
   $('tabs-bar').style.display='block';
   $('main').style.display='block';
-  // populate role select
-  const rs=$('new-emp-role');rs.innerHTML='';
-  biz.roles.forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.label;rs.appendChild(o);});
+
   renderAll();
 }
 
@@ -714,13 +721,17 @@ function renderEmpManage(){
   const el=$('emp-manage-list'),d=getData(),biz=getBiz();
   if(!d.employees.length){el.innerHTML='<div class="empty-state" style="padding:20px"><div class="empty-sb">אין עובדים עדיין</div></div>';return;}
   el.innerHTML=d.employees.map(e=>{
-    const role=biz.roles.find(r=>r.id===e.role)||{label:e.role||''};
+    const roles=Array.isArray(e.roles)?e.roles:(e.role?[e.role]:[]);
+    const roleLabels=roles.map(rid=>{const r=biz.roles.find(r=>r.id===rid);return r?r.label:rid;}).join(', ')||'—';
     return `<div class="em-row" style="border-color:${e.color}40">
       <div class="em-left">
         <div class="em-av" style="background:${e.color}2e;border:2px solid ${e.color};color:${e.color}">${e.name[0]}</div>
-        <div><div class="em-nm">${e.name}</div><div class="em-rl">${role.label} · ${totalAssigned(e.id)} משמרות</div></div>
+        <div><div class="em-nm">${e.name}</div><div class="em-rl">${roleLabels} · ${totalAssigned(e.id)} משמרות</div></div>
       </div>
-      <button class="btn-danger-sm em-del" data-id="${e.id}" data-name="${e.name}" data-color="${e.color}">מחק</button>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn-ghost" style="padding:5px 10px;font-size:11px" data-edit-id="${e.id}">✏️ ערוך</button>
+        <button class="btn-danger-sm em-del" data-id="${e.id}" data-name="${e.name}" data-color="${e.color}">מחק</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -744,7 +755,7 @@ function renderAssign(){
       }
       h+=`<td style="padding:3px 4px;vertical-align:middle"><div class="role-lbl"><span class="role-icon">${role.icon}</span>${role.label.replace(/^\S+\s/,'')}</div></td>`;
       wd.forEach((_,di)=>{
-        const avEmps=d.employees.filter(e=>(e.role===role.id)&&isAvailable(e.id,di,sh.id));
+        const avEmps=d.employees.filter(e=>{const rs=Array.isArray(e.roles)?e.roles:(e.role?[e.role]:[]);return rs.includes(role.id)&&isAvailable(e.id,di,sh.id);});
         const asgn=getAssigned(di,sh.id,role.id);
         h+=`<td style="padding:3px"><div class="cell">`;
         if(!avEmps.length)h+=`<div class="cell-empty">—</div>`;
@@ -1028,6 +1039,8 @@ $('gear-btn').onclick=()=>{renderEmpManage();$('emp-manage-modal').classList.add
 $('close-emp-manage').onclick=()=>$('emp-manage-modal').classList.remove('open');
 $('emp-manage-modal').addEventListener('click',e=>{if(e.target===$('emp-manage-modal'))$('emp-manage-modal').classList.remove('open');});
 $('emp-manage-list').addEventListener('click',e=>{
+  const ed=e.target.closest('[data-edit-id]');
+  if(ed){openEditEmpModal(parseInt(ed.dataset.editId));return;}
   const b=e.target.closest('.em-del');if(!b)return;
   pendingDeleteId=parseInt(b.dataset.id);
   const nm=b.dataset.name,co=b.dataset.color;
@@ -1042,17 +1055,76 @@ $('cd-yes').onclick=()=>{
 };
 $('cd-no').onclick=()=>{pendingDeleteId=null;$('confirm-delete-modal').classList.remove('open');};
 $('confirm-delete-modal').addEventListener('click',e=>{if(e.target===$('confirm-delete-modal')){pendingDeleteId=null;$('confirm-delete-modal').classList.remove('open');}});
-$('open-add-emp-btn').onclick=()=>{$('emp-manage-modal').classList.remove('open');$('new-emp-name').value='';$('add-emp-modal').classList.add('open');setTimeout(()=>$('new-emp-name').focus(),100);};
+let editingEmpId=null;
+
+function openAddEmpModal(){
+  editingEmpId=null;
+  $('add-emp-title').textContent='הוספת עובד';
+  $('new-emp-name').value='';
+  buildRoleCheckboxes([]);
+  $('emp-manage-modal').classList.remove('open');
+  $('add-emp-modal').classList.add('open');
+  setTimeout(()=>$('new-emp-name').focus(),100);
+}
+
+function openEditEmpModal(empId){
+  const d=getData(),biz=getBiz();
+  const emp=d.employees.find(e=>e.id===empId);if(!emp)return;
+  editingEmpId=empId;
+  $('add-emp-title').textContent='עריכת עובד';
+  $('new-emp-name').value=emp.name;
+  const currentRoles=Array.isArray(emp.roles)?emp.roles:(emp.role?[emp.role]:[]);
+  buildRoleCheckboxes(currentRoles);
+  $('emp-manage-modal').classList.remove('open');
+  $('add-emp-modal').classList.add('open');
+  setTimeout(()=>$('new-emp-name').focus(),100);
+}
+
+function buildRoleCheckboxes(selected){
+  const biz=getBiz();
+  const container=$('role-checkboxes');
+  container.innerHTML=biz.roles.map(r=>{
+    const isSelected=selected.includes(r.id);
+    return `<div class="role-check-row${isSelected?' selected':''}" data-role-id="${r.id}">
+      <div class="role-check-icon">${isSelected?'✓':''}</div>
+      <span class="role-check-label">${r.label}</span>
+    </div>`;
+  }).join('');
+  container.querySelectorAll('.role-check-row').forEach(row=>{
+    row.addEventListener('click',()=>{
+      row.classList.toggle('selected');
+      const icon=row.querySelector('.role-check-icon');
+      icon.textContent=row.classList.contains('selected')?'✓':'';
+    });
+  });
+}
+
+function getSelectedRoles(){
+  return [...$('role-checkboxes').querySelectorAll('.role-check-row.selected')].map(r=>r.dataset.roleId);
+}
+
+$('open-add-emp-btn').onclick=openAddEmpModal;
 $('cancel-add-emp').onclick=()=>$('add-emp-modal').classList.remove('open');
 $('add-emp-modal').addEventListener('click',e=>{if(e.target===$('add-emp-modal'))$('add-emp-modal').classList.remove('open');});
-$('confirm-add-emp').onclick=addEmp;
-$('new-emp-name').addEventListener('keydown',e=>{if(e.key==='Enter')addEmp();});
-function addEmp(){
+$('confirm-add-emp').onclick=saveEmp;
+$('new-emp-name').addEventListener('keydown',e=>{if(e.key==='Enter')saveEmp();});
+
+function saveEmp(){
   const nm=$('new-emp-name').value.trim();if(!nm){toast('הכנס שם');return;}
-  const d=getData();const role=$('new-emp-role').value;
-  const color=EMP_COLORS[d.employees.length%EMP_COLORS.length];
-  d.employees.push({id:Date.now(),name:nm,role,color});
-  $('add-emp-modal').classList.remove('open');renderAll();cloudSave();toast(`${nm} נוסף/ה`);
+  const roles=getSelectedRoles();if(!roles.length){toast('בחר לפחות תפקיד אחד');return;}
+  const d=getData();
+  if(editingEmpId){
+    const emp=d.employees.find(e=>e.id===editingEmpId);
+    if(emp){emp.name=nm;emp.roles=roles;emp.role=roles[0];}
+    toast(`${nm} עודכן/ה ✓`);
+  }else{
+    const color=EMP_COLORS[d.employees.length%EMP_COLORS.length];
+    d.employees.push({id:Date.now(),name:nm,roles,role:roles[0],color});
+    toast(`${nm} נוסף/ה ✓`);
+  }
+  editingEmpId=null;
+  $('add-emp-modal').classList.remove('open');
+  renderAll();cloudSave();
 }
 
 $('settings-btn').onclick=openSettings;
